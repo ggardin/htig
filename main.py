@@ -1,16 +1,15 @@
 import os
-from flask import Flask, flash, request, redirect, url_for, send_from_directory
+from flask import Flask, flash, request, redirect, render_template, url_for, send_from_directory
 from werkzeug.utils import secure_filename
-# import cv2
+import cv2
 import numpy as np
 
-UPLOAD_FOLDER = '/uploads'
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg'}
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1000 * 1000
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1000 * 1000
 
+# init instance directory
 os.makedirs(os.path.join(app.instance_path), exist_ok=True)
 
 def allowed_file(filename):
@@ -34,26 +33,18 @@ def upload_file():
             filename = secure_filename(file.filename)
             file.save(os.path.join(app.instance_path, filename))
             edit_image(os.path.join(app.instance_path, filename))
-            return redirect(url_for('download_file', name=filename))
-    return '''
-    <!doctype html>
-    <title>Upload new image</title>
-    <h1>Upload new image</h1>
-    <form method=post enctype=multipart/form-data>
-      <input type=file name=file>
-      <input type=submit value=Upload>
-    </form>
-    '''
+            return redirect(url_for('download_file', filename=filename))
+    return render_template('index.html')
 
-@app.route('/uploads/<name>')
-def download_file(name):
+@app.route('/uploads/<filename>')
+def download_file(filename):
     return send_from_directory(
-        app.instance_path, name
+        app.instance_path, filename
     )
 
-def edit_image(name):
+def edit_image(filename):
 	# Caricare l'immagine
-	immagine_originale = cv2.imread(name)
+	immagine_originale = cv2.imread(filename)
 
 	# Definire le nuove dimensioni
 	nuova_larghezza = 1080
@@ -78,7 +69,12 @@ def edit_image(name):
 	sfondo_bianco[centro_y:centro_y + dimensione_ridimensionata[1], centro_x:centro_x + dimensione_ridimensionata[0]] = immagine_ridimensionata
 
 	# Salvare l'immagine modificata
-	cv2.imwrite('immagine_ridimensionata.jpg', sfondo_bianco)
+	cv2.imwrite(os.path.join(app.instance_path, filename), sfondo_bianco)
+
+def cleanup():
+    for file in os.listdir(app.instance_path):
+        os.remove(os.path.join(app.instance_path, file))
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
+
